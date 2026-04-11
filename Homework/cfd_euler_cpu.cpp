@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <sstream>
 
+#include <omp.h>
+
 
 using namespace std;
 
@@ -56,8 +58,8 @@ void fluxY(double rho, double rhou, double rhov, double E,
 // ------------------------------------------------------------
 int main(){
     // ----- Grid and domain parameters -----
-    const int Nx = 200;         // Number of cells in x (excluding ghost cells)
-    const int Ny = 100;         // Number of cells in y
+    const int Nx = 200*16;         // Number of cells in x (excluding ghost cells)
+    const int Ny = 100*16;         // Number of cells in y
     const double Lx = 2.0;      // Domain length in x
     const double Ly = 1.0;      // Domain length in y
     const double dx = Lx / Nx;
@@ -134,10 +136,14 @@ int main(){
     // ----- Time stepping parameters -----
     const int nSteps = 2000;
 
+
+    double start_time = omp_get_wtime();
+
     // ----- Main time-stepping loop -----
     for (int n = 0; n < nSteps; n++){
         // --- Apply boundary conditions on ghost cells ---
         // Left boundary (inflow): fixed free-stream state
+        #pragma omp parallel for
         for (int j = 0; j < Ny+2; j++){
             rho[0*(Ny+2)+j] = rho0;
             rhou[0*(Ny+2)+j] = rho0*u0;
@@ -145,6 +151,7 @@ int main(){
             E[0*(Ny+2)+j] = E0;
         }
         // Right boundary (outflow): copy from the interior
+        #pragma omp parallel for
         for (int j = 0; j < Ny+2; j++){
             rho[(Nx+1)*(Ny+2)+j] = rho[Nx*(Ny+2)+j];
             rhou[(Nx+1)*(Ny+2)+j] = rhou[Nx*(Ny+2)+j];
@@ -152,6 +159,7 @@ int main(){
             E[(Nx+1)*(Ny+2)+j] = E[Nx*(Ny+2)+j];
         }
         // Bottom boundary: reflective
+        #pragma omp parallel for
         for (int i = 0; i < Nx+2; i++){
             rho[i*(Ny+2)+0] = rho[i*(Ny+2)+1];
             rhou[i*(Ny+2)+0] = rhou[i*(Ny+2)+1];
@@ -159,6 +167,7 @@ int main(){
             E[i*(Ny+2)+0] = E[i*(Ny+2)+1];
         }
         // Top boundary: reflective
+        #pragma omp parallel for
         for (int i = 0; i < Nx+2; i++){
             rho[i*(Ny+2)+(Ny+1)] = rho[i*(Ny+2)+Ny];
             rhou[i*(Ny+2)+(Ny+1)] = rhou[i*(Ny+2)+Ny];
@@ -167,6 +176,7 @@ int main(){
         }
 
         // --- Update interior cells using a Lax-Friedrichs scheme ---
+        #pragma omp parallel for collapse(2)
         for (int i = 1; i <= Nx; i++){
             for (int j = 1; j <= Ny; j++){
                 // If the cell is inside the solid obstacle, do not update it
@@ -215,6 +225,7 @@ int main(){
         }
 
         // Copy updated values back
+        #pragma omp parallel for collapse(2)
         for (int i = 1; i <= Nx; i++){
             for (int j = 1; j <= Ny; j++){
                 rho[i*(Ny+2)+j] = rho_new[i*(Ny+2)+j];
@@ -240,6 +251,8 @@ int main(){
         }
     }
 
+    double end_time = omp_get_wtime();
+    cout << "Total simulation time on CPU: " << (end_time - start_time) << " seconds" << endl;
+
     return 0;
 }
-

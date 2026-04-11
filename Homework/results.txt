@@ -1,0 +1,25 @@
+CC cfd_euler_cpu.cpp -Ofast -fopenmp -o cfd_cpu
+srun -p cpu --cpus-per-task=4 --time=0:05:00 --mem=8G ./cfd_cpu
+
+CPU:
+-- original size: (7745.78), Total simulation time on CPU:      0.213134 seconds
+-- 4xNx, 4xNy: (140558), Total simulation time on CPU:          3.83061 seconds
+-- 8xNx, 8xNy: (598349), Total simulation time on CPU:          15.0323 seconds
+-- 16xNx, 16xNy: (2.45694e+06), Total simulation time on CPU:   69.1105 seconds
+
+
+-----------------
+
+
+nvc++ -mp=gpu -gpu=cc80 -Ofast cfd_euler_gpu.cpp -o cfd_gpu -Minfo=accel,mp
+srun -p gpu --gres=gpu:1 --ntasks=1 --time=00:05:00 --mem=40G ./cfd_gpu
+
+GPU:
+-- original size: (7745.78), Total simulation time on GPU:      0.53695 seconds
+-- 4xNx, 4xNy: (140558), Total simulation time on GPU:          0.603824 seconds
+-- 8xNx, 8xNy: (598349), Total simulation time on GPU:          0.934067 seconds
+-- 16xNx, 16xNy: (2.45694e+06), Total simulation time on GPU:   2.09094 seconds
+
+
+-----------------
+GPU underperforms CPU at small problem sizes due to overhead, but at larger grid sizes GPU outperforms CPU drastically
